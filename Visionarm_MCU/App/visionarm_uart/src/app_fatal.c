@@ -6,6 +6,8 @@
 #include "task.h"
 #include "stm32f1xx_hal.h"
 
+#include "timer_pwm.h"
+
 volatile AppFatalState g_app_fatal_state;
 
 static void FatalStop(void);
@@ -29,6 +31,13 @@ void vApplicationStackOverflowHook(TaskHandle_t task, char *task_name)
 static void FatalStop(void)
 {
     __disable_irq();
+
+    /*
+     * Fatal software state must not leave a previously-running timer driving
+     * PA6/PA7. This function is register-level and does not depend on RTOS/HAL
+     * scheduler state.
+     */
+    TimerPwm_ForceSafeOutput();
 
     /* Force RS-485 DE low without relying on RTOS/HAL state. */
     RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;

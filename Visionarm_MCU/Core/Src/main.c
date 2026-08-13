@@ -4,7 +4,9 @@
 #include "task.h"
 
 #include "app_init.h"
+#include "pwm_bench_test.h"
 #include "rs485_uart.h"
+#include "timer_pwm.h"
 
 static void SystemClock_Config(void);
 static void Error_Handler(void);
@@ -15,7 +17,25 @@ int main(void)
     HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
     SystemClock_Config();
 
+    /*
+     * Step A/B/C boundary:
+     * configure TIM3 and PA6/PA7, but keep both PWM outputs disabled and low.
+     */
+    if (!TimerPwm_InitSafe())
+    {
+        Error_Handler();
+    }
+
     if (!Rs485Uart_Init() || !VisionArmApp_Init())
+    {
+        Error_Handler();
+    }
+
+    /*
+     * Step-C bench-only waveform generator.
+     * Do not connect the servo signal wires while this task is enabled.
+     */
+    if (!PwmBenchTest_Create())
     {
         Error_Handler();
     }
@@ -63,7 +83,16 @@ static void SystemClock_Config(void)
 static void Error_Handler(void)
 {
     __disable_irq();
-    Rs485Uart_EnterReceive();
+
+    /* Final actuator-safe software action. */
+    TimerPwm_ForceSafeOutput();
+
+    /* Force RS-485 DE low without depending on UART/HAL initialization state. */
+    RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;
+    GPIOD->BRR = (1UL << 7U);
+
+    __DSB();
+    __ISB();
 
     for (;;)
     {
