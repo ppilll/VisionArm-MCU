@@ -4,8 +4,8 @@
 #include "task.h"
 
 #include "app_init.h"
-#include "pwm_bench_test.h"
 #include "rs485_uart.h"
+#include "tilt_calibration_test.h"
 #include "timer_pwm.h"
 
 static void SystemClock_Config(void);
@@ -17,10 +17,6 @@ int main(void)
     HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
     SystemClock_Config();
 
-    /*
-     * Step A/B/C boundary:
-     * configure TIM3 and PA6/PA7, but keep both PWM outputs disabled and low.
-     */
     if (!TimerPwm_InitSafe())
     {
         Error_Handler();
@@ -32,10 +28,16 @@ int main(void)
     }
 
     /*
-     * Step-C bench-only waveform generator.
-     * Do not connect the servo signal wires while this task is enabled.
+     * V6 Step F: Tilt single-axis calibration.
+     *
+     * - The Step-C-proven dual-channel TimerPwm driver is unchanged.
+     * - PA7 / TIM3_CH2 is the Tilt calibration command.
+     * - PA6 / TIM3_CH1 stays at 1500 us only as an analyzer reference while
+     *   PWM is active.
+     * - The physical Pan servo SIGNAL must be disconnected during Step F.
+     * - PwmBenchTest_Create() and ServoCalibrationTest_Create() are NOT called.
      */
-    if (!PwmBenchTest_Create())
+    if (!TiltCalibrationTest_Create())
     {
         Error_Handler();
     }
@@ -84,10 +86,8 @@ static void Error_Handler(void)
 {
     __disable_irq();
 
-    /* Final actuator-safe software action. */
     TimerPwm_ForceSafeOutput();
 
-    /* Force RS-485 DE low without depending on UART/HAL initialization state. */
     RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;
     GPIOD->BRR = (1UL << 7U);
 
