@@ -1,7 +1,7 @@
 #include "app_init.h"
 
 #include "control_mailbox.h"
-#include "gimbal_stub.h"
+#include "gimbal_task.h"
 #include "protocol_dispatcher.h"
 #include "protocol_engine.h"
 #include "protocol_rx_task.h"
@@ -30,7 +30,8 @@ bool VisionArmApp_Init(void)
         return false;
     }
 
-    if (!GimbalStubTask_Create())
+    /* V6 Step J: real GimbalTask replaces the former gimbal_stub task. */
+    if (!GimbalTask_Create())
     {
         return false;
     }

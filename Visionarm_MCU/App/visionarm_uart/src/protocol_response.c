@@ -6,7 +6,7 @@
 
 #include "app_config.h"
 #include "control_mailbox.h"
-#include "gimbal_stub.h"
+#include "gimbal_runtime.h"
 #include "protocol_engine.h"
 #include "protocol_policy.h"
 #include "protocol_state.h"
@@ -55,13 +55,13 @@ bool ProtocolResponse_SendStatus(void)
     va_uart_status_t status = {0};
     ProtocolStateSnapshot state;
     ProtocolRxStats rx_stats;
-    GimbalStubSnapshot gimbal;
+    GimbalRuntimeSnapshot gimbal;
     uint8_t payload[52U];
     size_t payload_size;
 
     ProtocolState_GetSnapshot(&state);
     ProtocolEngine_GetRxStats(&rx_stats);
-    GimbalStub_GetSnapshot(&gimbal);
+    GimbalRuntime_GetSnapshot(&gimbal);
 
     status.mcu_state = PROTOCOL_MCU_STATE_RUNNING;
     status.link_state = (uint8_t)state.link_state;
@@ -78,8 +78,17 @@ bool ProtocolResponse_SendStatus(void)
     status.rx_overflow_count = UartRxRing_GetOverflowCount();
     status.control_mailbox_overwrite_count = ControlMailbox_GetOverwriteCount();
     status.mcu_tick_ms = HAL_GetTick();
-    status.pan_stub_q15 = gimbal.pan_q15;
-    status.tilt_stub_q15 = gimbal.tilt_q15;
+
+    /*
+     * V1 wire compatibility is preserved: the two historical *_stub_q15
+     * fields now report the actual applied actuator position command,
+     * normalized around the calibrated center and safe limits.
+     *
+     * Pan:  safe-min -> -32767, center -> 0, safe-max -> +32767.
+     * Tilt: safe-min -> -32767, center -> 0, safe-max -> +32767.
+     */
+    status.pan_stub_q15 = gimbal.pan_applied_q15;
+    status.tilt_stub_q15 = gimbal.tilt_applied_q15;
 
     if (!va_uart_encode_status(&status, payload, sizeof(payload), &payload_size))
     {

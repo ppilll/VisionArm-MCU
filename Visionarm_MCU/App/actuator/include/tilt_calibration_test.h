@@ -24,7 +24,7 @@
  * direction test.  For center calibration, set REFERENCE and TARGET equal.
  */
 #define TILT_CAL_REFERENCE_US            1500U
-#define TILT_CAL_TARGET_US               1200U
+#define TILT_CAL_TARGET_US               1550U
 
 /*
  * Vendor reference source for the 180 degree upper servo limits its arm
