@@ -3,15 +3,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#include "actuator_driver.h"
-#include "app_init.h"
-#include "gimbal_config.h"
-#include "rs485_uart.h"
-#include "timer_pwm.h"
-
-#if GIMBAL_STEP_G_SELF_TEST_ENABLED
-#include "actuator_driver_test.h"
-#endif
+#include "visionarm_app.h"
 
 static void SystemClock_Config(void);
 static void Error_Handler(void);
@@ -22,32 +14,10 @@ int main(void)
     HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
     SystemClock_Config();
 
-    /*
-     * Step-G product boundary:
-     * application code initializes ActuatorDriver, never TIM3 directly.
-     * InitSafe leaves both physical servo outputs disabled and LOW.
-     */
-    if (!ActuatorDriver_InitSafe())
+    if (!VisionArmApp_Init())
     {
         Error_Handler();
     }
-
-    if (!Rs485Uart_Init() || !VisionArmApp_Init())
-    {
-        Error_Handler();
-    }
-
-#if GIMBAL_STEP_G_SELF_TEST_ENABLED
-    /*
-     * One-shot Step-G physical validation only.
-     * The final Step-G baseline sets the switch to 0 so no autonomous
-     * actuator motion occurs before Step H installs the SafetyGate owner.
-     */
-    if (!ActuatorDriverTest_Create())
-    {
-        Error_Handler();
-    }
-#endif
 
     vTaskStartScheduler();
     Error_Handler();
@@ -92,13 +62,7 @@ static void SystemClock_Config(void)
 static void Error_Handler(void)
 {
     __disable_irq();
-
-    /* Fatal/emergency path deliberately bypasses higher-level state. */
-    TimerPwm_ForceSafeOutput();
-
-    RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;
-    GPIOD->BRR = (1UL << 7U);
-
+    VisionArmApp_EmergencyStop();
     __DSB();
     __ISB();
 
